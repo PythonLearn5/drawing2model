@@ -1,0 +1,15 @@
+# Drawing2Model 主服务依赖 (server.py / mcp_server.py 进程内)
+# Python >= 3.10
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2.6
+openai>=1.30
+mcp>=1.0,<2.0
+jinja2>=3.1
+numpy>=1.26
+pymupdf>=1.24
+opencv-python-headless>=4.9
+pillow>=10.2
+numpy-stl>=3.1
+matplotlib>=3.8

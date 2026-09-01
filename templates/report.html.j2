@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>制造报告 · {{ task.name }}</title>
+{% if favicon_b64 %}<link rel="icon" href="data:image/png;base64,{{ favicon_b64 }}" />{% endif %}
+<script>
+/* 首帧防闪烁：绘制前先落主题 */
+(function () {
+  var THEME_KEY = "d2c-report-theme";
+  var mode = "auto";
+  try { mode = localStorage.getItem(THEME_KEY) || "auto"; } catch (e) {}
+  if (["auto", "light", "dark"].indexOf(mode) < 0) mode = "auto";
+  var resolved = mode;
+  if (mode === "auto") {
+    resolved = (window.matchMedia &&
+                window.matchMedia("(prefers-color-scheme: dark)").matches)
+               ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-theme", resolved);
+  document.documentElement.setAttribute("data-mode", mode);
+})();
+</script>
+<style>
+  /* ================== 设计变量 ================== */
+  :root {
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+
+    /* 默认：深色科技主题 */
+    --bg: #05070f;
+    --glow-1: rgba(37, 99, 235, .26);
+    --glow-2: rgba(34, 211, 238, .15);
+    --glow-3: rgba(139, 92, 246, .17);
+    --grid-line: rgba(96, 150, 255, .05);
+
+    --card: rgba(13, 21, 40, .62);
+    --card-solid: #0c1425;
+    --border: rgba(96, 150, 255, .16);
+    --border-strong: rgba(96, 150, 255, .4);
+
+    --text: #e9effc;
+    --text-2: #9aabd0;
+    --text-3: #5c6d92;
+
+    --accent: #4d8dff;
+    --accent-2: #22d3ee;
+    --accent-3: #a78bfa;
+    --grad: linear-gradient(120deg, #2563eb 0%, #06b6d4 55%, #8b5cf6 110%);
+    --grad-text: linear-gradient(94deg, #7db4ff 0%, #5eead4 48%, #c4b5fd 100%);
+    --grad-glow: rgba(37, 99, 235, .4);
+
+    --ok: #4ade80; --ok-bg: rgba(74, 222, 128, .1); --ok-bd: rgba(74, 222, 128, .32);
+    --warn: #fbbf24; --warn-bg: rgba(251, 191, 36, .1); --warn-bd: rgba(251, 191, 36, .34);
+    --danger: #f87171; --danger-bg: rgba(248, 113, 113, .12); --danger-bd: rgba(248, 113, 113, .34);
+    --err: #f87171; --err-bg: rgba(248, 113, 113, .1); --err-bd: rgba(248, 113, 113, .32);
+
+    --table-head: rgba(59, 130, 246, .09);
+    --table-stripe: rgba(96, 150, 255, .045);
+    --code-bg: #070c18;
+    --code-text: #cfe0ff;
+    --code-cmt: #5b7bb2;
+    --shadow: 0 14px 40px rgba(0, 0, 0, .42);
+    --viewer-bg: radial-gradient(620px 300px at 50% 0%, rgba(37,99,235,.16), transparent 70%),
+                 linear-gradient(180deg, #0a1222 0%, #060a14 100%);
+  }
+  [data-theme="light"] {
+    --bg: #f2f5fc;
+    --glow-1: rgba(59, 130, 246, .16);
+    --glow-2: rgba(34, 211, 238, .13);
+    --glow-3: rgba(139, 92, 246, .1);
+    --grid-line: rgba(47, 99, 235, .06);
+
+    --card: rgba(255, 255, 255, .78);
+    --card-solid: #ffffff;
+    --border: rgba(76, 119, 235, .15);
+    --border-strong: rgba(76, 119, 235, .34);
+
+    --text: #17233d;
+    --text-2: #51607e;
+    --text-3: #8a97b0;
+
+    --accent: #2f7bff;
+    --grad-text: linear-gradient(94deg, #1d4ed8 0%, #0e7490 48%, #6d28d9 100%);
+
+    --ok: #16a34a; --ok-bg: rgba(22, 163, 74, .09); --ok-bd: rgba(22, 163, 74, .3);
+    --warn: #d97706; --warn-bg: rgba(217, 119, 6, .09); --warn-bd: rgba(217, 119, 6, .32);
+    --danger: #dc2626; --danger-bg: rgba(220, 38, 38, .09); --danger-bd: rgba(220, 38, 38, .3);
+    --err: #dc2626; --err-bg: rgba(220, 38, 38, .09); --err-bd: rgba(220, 38, 38, .3);
+
+    --table-head: rgba(59, 130, 246, .07);
+    --table-stripe: rgba(59, 130, 246, .035);
+    --code-bg: #0b1220;
+    --code-text: #cfe0ff;
+    --shadow: 0 10px 32px rgba(31, 64, 130, .09);
+    --viewer-bg: radial-gradient(620px 300px at 50% 0%, rgba(37,99,235,.1), transparent 70%),
+                 linear-gradient(180deg, #eef3fc 0%, #e4ebf8 100%);
+  }
+
+  /* ================== 基础 ================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei",
+                 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 全局背景：光晕 + 几何网格 */
+  .bg-fx {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(1100px 600px at 12% -8%, var(--glow-1) 0%, transparent 62%),
+      radial-gradient(900px 560px at 100% 10%, var(--glow-3) 0%, transparent 58%),
+      radial-gradient(1000px 640px at 88% 108%, var(--glow-2) 0%, transparent 56%),
+      var(--bg);
+  }
+  .bg-fx::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 90% 72% at 50% 16%, #000 30%, transparent 92%);
+    mask-image: radial-gradient(ellipse 90% 72% at 50% 16%, #000 30%, transparent 92%);
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 22px 28px 56px; }
+
+  ::selection { background: rgba(59, 130, 246, .3); }
+
+  /* ================== 工具栏 ================== */
+  .toolbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; justify-content: flex-end; align-items: center;
+    gap: 8px; flex-wrap: wrap;
+    padding: 10px 26px;
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border-bottom: 1px solid var(--border);
+  }
+  .toolbar .brand {
+    margin-right: auto; display: inline-flex; align-items: center; gap: 10px;
+    color: var(--text); text-decoration: none;
+  }
+  .toolbar .brand .b-name { font-weight: 700; letter-spacing: .5px; font-size: 14px;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent; }
+  .toolbar .brand .b-sub { font-size: 10.5px; color: var(--text-3);
+    letter-spacing: 1.6px; font-family: var(--mono); }
+  .toolbar .brand img { width: 26px; height: 26px; border-radius: 7px;
+    box-shadow: 0 3px 12px var(--grad-glow); }
+
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 9px; cursor: pointer; flex: none;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    color: var(--text-2); display: inline-flex; align-items: center;
+    justify-content: center; transition: all .22s var(--ease);
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--border-strong);
+    box-shadow: 0 0 14px var(--grad-glow); transform: translateY(-1px); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border); border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    color: var(--text-2);
+    padding: 6.5px 13px; font-size: 12.5px; cursor: pointer;
+    transition: all .22s var(--ease); letter-spacing: .3px;
+    font-family: inherit;
+  }
+  .btn .fmt { font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: .8px; padding: 1.5px 6px; border-radius: 5px;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .btn:hover { color: var(--accent); border-color: var(--border-strong);
+    box-shadow: 0 0 14px var(--grad-glow); transform: translateY(-1px); }
+  .btn.primary {
+    background: var(--grad); border: none; color: #fff; font-weight: 600;
+    box-shadow: 0 4px 16px var(--grad-glow);
+  }
+  .btn.primary:hover { color: #fff; filter: brightness(1.08);
+    box-shadow: 0 6px 22px var(--grad-glow); }
+
+  /* ================== Hero ================== */
+  .hero {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 30px 32px; margin-top: 20px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 18px; box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+  }
+  .hero::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--grad); opacity: .9;
+  }
+  .hero::after {
+    content: ""; position: absolute; right: -120px; top: -140px;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, var(--glow-1), transparent 68%);
+    pointer-events: none;
+  }
+  .hero img.logo { height: 62px; position: relative; filter: drop-shadow(0 6px 18px var(--grad-glow)); }
+  .hero .h-main { position: relative; flex: 1; min-width: 260px; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 2.6px;
+    color: var(--accent-2); margin-bottom: 8px; text-transform: uppercase;
+  }
+  .hero .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2);
+    animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.75); } }
+  .hero .title {
+    font-size: 24px; font-weight: 750; letter-spacing: .6px; line-height: 1.35;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .hero .sub { color: var(--text-3); font-size: 12.5px; margin-top: 8px;
+    font-family: var(--mono); letter-spacing: .4px; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .badge {
+    font-size: 12px; padding: 3px 12px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    letter-spacing: .3px;
+  }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bd); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
+  /* 重建置信度卡片 */
+  .conf-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .conf-badge { display: inline-block; padding: 4px 14px; border-radius: 999px;
+    font-weight: 700; font-size: 13px; border: 1px solid; letter-spacing: .5px; }
+  .conf-badge.high { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bd); }
+  .conf-badge.medium { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
+  .conf-badge.low, .conf-badge.estimate { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-bd); }
+  .conf-fam { font-size: 12px; color: var(--muted); }
+  .conf-notes { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; line-height: 1.75; }
+  .conf-notes li { margin-bottom: 4px; }
+  .badge.mono { font-family: var(--mono); font-size: 11px; letter-spacing: .8px; }
+
+  /* ================== 概览数据带 ================== */
+  .stats-band {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 18px;
+    backdrop-filter: blur(12px);
+    transition: all .3s var(--ease); position: relative; overflow: hidden;
+  }
+  .stat::after {
+    content: ""; position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px;
+    background: var(--grad); opacity: 0; transition: opacity .3s var(--ease);
+  }
+  .stat:hover { transform: translateY(-3px); border-color: var(--border-strong);
+    box-shadow: 0 10px 30px rgba(37, 99, 235, .14); }
+  .stat:hover::after { opacity: 1; }
+  .stat .s-label { font-size: 11px; color: var(--text-3); letter-spacing: 1.8px;
+    text-transform: uppercase; font-family: var(--mono); }
+  .stat .s-value {
+    font-family: var(--mono); font-size: 24px; font-weight: 700; margin-top: 5px;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    word-break: break-all;
+  }
+  .stat .s-note { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
+
+  /* ================== VLM 语义理解卡片 ================== */
+  .vlm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 18px; margin-bottom: 12px; }
+  .vlm-item { display: flex; flex-direction: column; gap: 4px;
+    background: rgba(37, 99, 235, .06); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; }
+  .vlm-k { font-size: 11px; color: var(--text-3); letter-spacing: 1px; }
+  .vlm-v { font-size: 15px; font-weight: 600; color: var(--text-1); word-break: break-all; }
+  .vlm-tech { font-size: 13px; color: var(--text-2); line-height: 1.7;
+    background: rgba(37, 99, 235, .05); border-left: 3px solid var(--accent-1);
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; }
+  .vlm-src { font-size: 12px; color: var(--text-3); }
+  .vlm-src code { font-family: var(--mono); color: var(--accent-1);
+    background: rgba(37, 99, 235, .1); padding: 1px 6px; border-radius: 4px; }
+  .vlm-fallback { font-size: 13px; color: var(--warn, #e0a458); line-height: 1.7;
+    background: rgba(224, 164, 88, .1); border-left: 3px solid var(--warn, #e0a458);
+    border-radius: 6px; padding: 10px 14px; }
+
+  /* ================== 卡片 ================== */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--shadow);
+    backdrop-filter: blur(14px);
+    padding: 22px 26px; margin-top: 18px;
+    animation: rise .5s var(--ease) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  .card h2 {
+    font-size: 16px; font-weight: 650; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px; letter-spacing: .4px;
+  }
+  .card h2::before {
+    content: ""; width: 4px; height: 17px; border-radius: 3px;
+    background: var(--grad); box-shadow: 0 0 10px var(--grad-glow);
+  }
+  .card h2 .h-sub { margin-left: auto; font-size: 11px; font-weight: 400;
+    color: var(--text-3); font-family: var(--mono); letter-spacing: 1.2px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  .grid-2 > .card { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 13px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--table-head); color: var(--text-2); font-weight: 600;
+       white-space: nowrap; letter-spacing: .5px; font-size: 12px; }
+  tbody tr { transition: background .2s var(--ease); }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  td.k { color: var(--text-2); width: 38%; }
+  td .mono, .mono { font-family: var(--mono); font-size: 12px; letter-spacing: .3px; }
+
+  /* 工序序号徽标 */
+  .op-no {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 8px;
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: #fff; background: var(--grad);
+    box-shadow: 0 3px 10px var(--grad-glow);
+  }
+
+  /* ================== 3D 查看器 ================== */
+  #viewer-wrap {
+    position: relative; height: 440px; border-radius: 14px;
+    overflow: hidden; background: var(--viewer-bg);
+    border: 1px solid var(--border);
+  }
+  #viewer-wrap::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background-image:
+      linear-gradient(rgba(96,150,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,150,255,.05) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  #viewer3d { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
+  .viewer-tools { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; z-index: 4; }
+  #viewer-wrap:fullscreen {
+    height: 100vh; width: 100vw; border-radius: 0; border: none;
+  }
+  #viewer-wrap:fullscreen #viewer3d { width: 100%; height: 100%; }
+  .viewer-badge {
+    position: absolute; left: 14px; bottom: 12px; z-index: 4;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.6px;
+    color: rgba(158, 185, 230, .68);
+  }
+  .viewer-fallback { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 2; }
+  /* 报告内多模型产物切换条 */
+  .report-switch-bar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .report-switch-label {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .5px;
+    color: var(--text-2);
+  }
+  .report-product-select {
+    background: var(--bg-2); color: var(--text-1);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 6px 10px; font-size: 13px; cursor: pointer; min-width: 220px;
+  }
+  .report-product-select:focus { outline: none; border-color: var(--accent-1); }
+
+  .tv-img { width: 100%; border-radius: 12px; border: 1px solid var(--border); }
+  /* 三视图双主题：随 data-theme 切换显示对应版本 */
+  .tv-wrap { position: relative; }
+  .tv-wrap .tv-dark { display: none; }
+  [data-theme="dark"] .tv-wrap .tv-light { display: none; }
+  [data-theme="dark"] .tv-wrap .tv-dark { display: block; }
+
+  /* ================== G-code ================== */
+  pre.gcode {
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 12px; padding: 16px 18px; overflow: auto;
+    font-family: var(--mono);
+    font-size: 12px; line-height: 1.7; max-height: 340px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 2px 14px rgba(0, 0, 0, .35);
+  }
+  pre.gcode::-webkit-scrollbar { width: 8px; height: 8px; }
+  pre.gcode::-webkit-scrollbar-thumb { background: rgba(96,150,255,.28); border-radius: 6px; }
+  .gcode-head { display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; flex-wrap: wrap;
+    margin: 12px 0 8px; color: var(--text-2); font-size: 13px; }
+  .gcode-head .fname { font-family: var(--mono); font-size: 12px; color: var(--accent-2); }
+
+  /* ================== 结论 / 提示 ================== */
+  .conclusion {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 13.5px; font-weight: 600;
+    padding: 10px 18px; border-radius: 12px; letter-spacing: .3px;
+  }
+  .conclusion.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-bd); }
+  .conclusion.fail { color: var(--err); background: var(--err-bg); border: 1px solid var(--err-bd); }
+  .note { color: var(--text-3); font-size: 12px; margin-top: 8px; }
+  .disclaimer {
+    margin-top: 24px; padding: 14px 18px; border-radius: 12px;
+    background: var(--warn-bg); border: 1px solid var(--warn-bd);
+    color: var(--warn); font-size: 12.5px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .disclaimer .d-ico { flex: none; font-weight: 700; }
+  footer { text-align: center; color: var(--text-3); font-size: 12px;
+    margin-top: 30px; letter-spacing: .4px; }
+  footer .f-dot { margin: 0 8px; opacity: .5; }
+
+  /* ================== 响应式 ================== */
+  @media (max-width: 960px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .stats-band { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .page { padding: 14px 14px 44px; }
+    .toolbar { padding: 8px 14px; gap: 6px; }
+    .toolbar .brand .b-sub { display: none; }
+    .hero { padding: 22px 20px; }
+    .hero .title { font-size: 20px; }
+    .stats-band { grid-template-columns: 1fr 1fr; gap: 10px; }
+    #viewer-wrap { height: 300px; }
+    .card { padding: 18px 16px; }
+    th, td { padding: 7px 9px; }
+  }
+
+  /* ================== 打印适配 ================== */
+  .print-only { display: none; }
+  @media print {
+    body { background: #fff !important; color: #111; font-size: 12px; }
+    .bg-fx, .toolbar, .viewer-tools, .no-print { display: none !important; }
+    .card, .hero, .stat {
+      box-shadow: none; backdrop-filter: none; background: #fff;
+      border: 1px solid #ddd; break-inside: avoid; animation: none;
+      color: #111;
+    }
+    .hero .title, .stat .s-value {
+      -webkit-text-fill-color: #1a3a7a; color: #1a3a7a; background: none;
+    }
+    .hero .eyebrow { color: #1a3a7a; }
+    .hero .eyebrow .dot { animation: none; background: #1a3a7a; box-shadow: none; }
+    .badge { background: #f0f4fb; color: #1a3a7a; border-color: #c9d8f2; }
+    .badge.ok { color: #15803d; } .badge.warn { color: #b45309; }
+    .stat .s-label, .hero .sub, .note, footer, .viewer-badge { color: #666 !important; }
+    #viewer-section { display: none !important; }
+    .print-only { display: block; }
+    /* 打印固定使用浅色三视图（白底打印纸） */
+    .tv-wrap .tv-light { display: block !important; }
+    .tv-wrap .tv-dark { display: none !important; }
+    pre.gcode { max-height: none; background: #f4f6f9; color: #222;
+      border: 1px solid #ddd; box-shadow: none; }
+    th { background: #eef2f8; color: #333; }
+    tbody tr:nth-child(even) { background: #f7f9fc; }
+    th, td { border-bottom: 1px solid #e3e8f0; }
+    .conclusion.ok { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+    .conclusion.fail { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .disclaimer { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+    .op-no { background: #2563eb; box-shadow: none; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  /* ================== 回到顶部悬浮按钮 ================== */
+  .rpt-totop {
+    position: fixed; right: 28px; bottom: 28px; z-index: 60;
+    width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-strong); border-radius: 14px;
+    background: var(--card); color: var(--accent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+    cursor: pointer; opacity: 0; transform: translateY(16px) scale(.9);
+    pointer-events: none;
+    transition: opacity .28s var(--ease), transform .28s var(--ease),
+                background .2s, color .2s, border-color .2s;
+  }
+  .rpt-totop.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .rpt-totop:hover { background: var(--grad); color: #fff; border-color: transparent; }
+  @media (max-width: 600px) {
+    .rpt-totop { right: 16px; bottom: 16px; width: 42px; height: 42px; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-fx no-print" aria-hidden="true"></div>
+
+<!-- ======= 工具栏 ======= -->
+<div class="toolbar no-print">
+  <span class="brand">
+    {% if logo_b64 %}<img src="data:image/png;base64,{{ logo_b64 }}" alt="logo">{% endif %}
+    <span>
+      <div class="b-name">Drawing2CAD</div>
+      <div class="b-sub">MANUFACTURING REPORT</div>
+    </span>
+  </span>
+  <button class="icon-btn" id="btn-theme" title="主题切换（自动/浅色/暗色）">
+    <svg id="icon-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round"></svg>
+  </button>
+  <button class="icon-btn" id="btn-print" title="打印报告">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 6 2 18 2 18 9"></polyline>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+      <rect x="6" y="14" width="12" height="8"></rect>
+    </svg>
+  </button>
+  {% for f in download_files %}
+  <button class="btn" data-file="{{ loop.index0 }}" title="下载 {{ f.name }}（{{ f.size }}）">
+    <span class="fmt">{{ f.name.rsplit('.', 1)[1] | upper }}</span>
+  </button>
+  {% endfor %}
+  <button class="btn primary" id="btn-zip">⬇ 全部打包</button>
+</div>
+
+<div class="page">
+
+  <!-- ======= 头部 ======= -->
+  <section class="hero">
+    {% if logo_b64 %}<img class="logo" src="data:image/png;base64,{{ logo_b64 }}" alt="logo">{% endif %}
+    <div class="h-main">
+      <div class="eyebrow"><span class="dot"></span>Intelligent CAD Reconstruction</div>
+      <div class="title">零部件制造 / 数控加工报告</div>
+      <div class="sub">
+        FILE {{ task.name }} &nbsp;·&nbsp; TASK {{ task.id }} &nbsp;·&nbsp; GENERATED {{ task.generated }}
+      </div>
+      <div class="badges">
+        <span class="badge">输入来源：{{ feat.get('source', task.ext) }}</span>
+        {% if feat.get('size_mm') %}
+        <span class="badge mono">{{ feat['size_mm'][0] }} × {{ feat['size_mm'][1] }} × {{ feat['size_mm'][2] }} mm</span>
+        {% endif %}
+        {% if feat.get('volume_cm3') %}<span class="badge mono">V {{ feat['volume_cm3'] }} cm³</span>{% endif %}
+        {% if verify_passed %}
+        <span class="badge ok">✓ 三视图验证通过</span>
+        {% else %}
+        <span class="badge warn">⚠ 验证存在未决项</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= 概览数据带 ======= -->
+  <div class="stats-band">
+    <div class="stat">
+      <div class="s-label">Outline Size</div>
+      <div class="s-value">{% if feat.get('size_mm') %}{{ feat['size_mm'][0] }}×{{ feat['size_mm'][1] }}×{{ feat['size_mm'][2] }}{% else %}-{% endif %}</div>
+      <div class="s-note">外形尺寸（mm）</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">Holes</div>
+      <div class="s-value">{{ (feat.get('cam') or {}).get('holes', feat.get('holes', '-')) }}</div>
+      <div class="s-note">孔特征数量</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">Verify Rounds</div>
+      <div class="s-value">{{ verify_rows | length }}</div>
+      <div class="s-note">三视图验证迭代轮次</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">G-code Lines</div>
+      <div class="s-value">
+        {%- set ns = namespace(n=0) -%}
+        {%- for key in ('mill', 'turn') -%}{%- if gcodes.get(key) -%}{%- set ns.n = ns.n + gcodes[key].lines -%}{%- endif -%}{%- endfor -%}
+        {{ ns.n if ns.n else '-' }}
+      </div>
+      <div class="s-note">数控代码总行数</div>
+    </div>
+  </div>
+
+  <!-- ======= VLM 语义理解（混合路线，随主题切换） ======= -->
+  {% if vlm %}
+  <section class="card">
+    <h2>语义理解（VLM）<span class="h-sub">MULTIMODAL SEMANTIC</span></h2>
+    {% if vlm.enabled %}
+    <div class="vlm-grid">
+      <div class="vlm-item"><span class="vlm-k">零件类型</span><span class="vlm-v">{{ vlm.part_type or '-' }}</span></div>
+      <div class="vlm-item"><span class="vlm-k">视图布局</span><span class="vlm-v">{{ vlm.views | join(' · ') or '-' }}</span></div>
+      <div class="vlm-item"><span class="vlm-k">特征清单</span><span class="vlm-v">{{ vlm.features | join(' · ') or '-' }}</span></div>
+      <div class="vlm-item"><span class="vlm-k">置信度</span><span class="vlm-v">{{ vlm.confidence }}</span></div>
+    </div>
+    {% if vlm.tech_requirements %}
+    <div class="vlm-tech"><b>技术要求：</b>{{ vlm.tech_requirements }}</div>
+    {% endif %}
+    <div class="vlm-src">来源：<code>{{ vlm.model }}</code>{% if vlm.summary %} · {{ vlm.summary }}{% endif %}</div>
+    {% else %}
+    <div class="vlm-fallback">⚠ VLM 未启用，已降级规则引擎：{{ vlm.fallback_reason or '未配置 API Key，使用本地规则引擎' }}</div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- ======= 重建置信度与依据 ======= -->
+  {% if feat.get('confidence') or feat.get('confidence_notes') %}
+  <section class="card">
+    <h2>重建置信度与依据<span class="h-sub">RECONFIDENCE</span></h2>
+    <div class="conf-row">
+      <span class="conf-badge {{ feat.get('confidence', '') }}">{{ feat.get('confidence', '-') }}</span>
+      {% if feat.get('family') %}<span class="conf-fam">零件族：{{ feat.get('family') }}</span>{% endif %}
+      {% if feat.get('strategy') %}<span class="conf-fam">策略：{{ feat.get('strategy') }}</span>{% endif %}
+    </div>
+    {% if feat.get('confidence_notes') %}
+    <ul class="conf-notes">
+      {% for note in feat.confidence_notes %}
+      <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- ======= 3D 模型 ======= -->
+  <section class="card" id="viewer-section">
+    <h2>3D 模型交互查看<span class="h-sub">WEBGL · GLB EMBEDDED</span></h2>
+    {% if has_multi %}
+    <div class="report-switch-bar">
+      <span class="report-switch-label">模型产物切换</span>
+      <select id="product-select" class="report-product-select">
+        {% for p in model_products %}
+        <option value="{{ loop.index0 }}">{{ p.name }}{% if p.verdict_ok %} ✓{% else %} …{% endif %} · {{ p.kind }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div id="viewer-wrap">
+      {% if glb_b64 %}
+      <canvas id="viewer3d"></canvas>
+      <div class="viewer-tools">
+        <button class="icon-btn" id="btn-wire" title="线框切换">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12"/><path d="M21 7l-9 5-9-5"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btn-full" title="全屏查看">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9V5a1 1 0 0 1 1-1h4"/>
+            <path d="M20 9V5a1 1 0 0 0-1-1h-4"/>
+            <path d="M4 15v4a1 1 0 0 0 1 1h4"/>
+            <path d="M20 15v4a1 1 0 0 1-1 1h-4"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btn-fit" title="复位视角">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7"/>
+            <path d="M3 4v5h5"/>
+          </svg>
+        </button>
+      </div>
+      <div class="viewer-badge">DRAG TO ROTATE · WHEEL TO ZOOM</div>
+      {% elif three_view_b64 %}
+      <div class="tv-wrap" style="height:100%;display:flex;align-items:center;justify-content:center;position:relative;z-index:2">
+        <img class="viewer-fallback tv-img tv-light" src="data:image/png;base64,{{ three_view_b64 }}" alt="三视图">
+        {% if three_view_dark_b64 %}
+        <img class="viewer-fallback tv-img tv-dark" src="data:image/png;base64,{{ three_view_dark_b64 }}" alt="三视图（暗色）">
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="padding:40px;color:var(--text-3);position:relative;z-index:2">无可用模型预览</div>
+      {% endif %}
+    </div>
+    <div class="note">鼠标拖拽旋转 · 滚轮缩放（离线 GLB 已内嵌，无需网络）</div>
+  </section>
+
+  <!-- ======= 三视图验证对比（打印时替代 3D 区；浅色/暗色双版本随主题切换） ======= -->
+  {% if three_view_b64 %}
+  <section class="card">
+    <h2>三视图投影验证<span class="h-sub">HLR HIDDEN-LINE REMOVAL</span></h2>
+    <div class="tv-wrap">
+      <img class="tv-img tv-light" src="data:image/png;base64,{{ three_view_b64 }}" alt="三视图">
+      {% if three_view_dark_b64 %}
+      <img class="tv-img tv-dark" src="data:image/png;base64,{{ three_view_dark_b64 }}" alt="三视图（暗色）">
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="grid-2">
+    <!-- ======= 尺寸表 ======= -->
+    <section class="card">
+      <h2>尺寸表<span class="h-sub">DIMENSIONS</span></h2>
+      <table>
+        <tbody>
+          {% for k, v in dims_rows %}
+          <tr><td class="k">{{ k }}</td><td class="mono">{{ v }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if depth_source %}
+      <div class="note">深度来源：{{ depth_source }}</div>
+      {% endif %}
+    </section>
+
+    <!-- ======= 毛坯与材料 ======= -->
+    <section class="card">
+      <h2>毛坯 / 材料<span class="h-sub">MATERIAL</span></h2>
+      <table>
+        <tbody>
+          <tr><td class="k">材料</td><td>{{ material }}</td></tr>
+          <tr><td class="k">毛坯规格</td><td class="mono">{{ blank }}</td></tr>
+          <tr><td class="k">装夹方式</td><td>平口钳 / 三爪卡盘（视工序）</td></tr>
+          <tr><td class="k">加工类型</td>
+            <td>{% if (feat.get('cam') or {}).get('five_axis') %}五轴叶片侧铣（几何驱动 swarf）{% elif (feat.get('cam') or {}).get('turning') %}车削（回转体）+ 铣削{% else %}2.5D 铣削{% endif %}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <!-- ======= 工艺路线卡 ======= -->
+    <section class="card">
+      <h2>工艺路线卡<span class="h-sub">PROCESS ROUTING</span></h2>
+      <table>
+        <thead><tr><th style="width:44px">序号</th><th>工序</th><th>内容</th><th>参数</th></tr></thead>
+        <tbody>
+          {% for no, name, content, param in process_rows %}
+          <tr>
+            <td><span class="op-no">{{ no }}</span></td>
+            <td style="font-weight:600;white-space:nowrap">{{ name }}</td>
+            <td>{{ content }}</td>
+            <td class="mono">{{ param }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ======= 验证记录 ======= -->
+    <section class="card">
+      <h2>三视图验证闭环记录<span class="h-sub">VERIFY LOOP</span></h2>
+      {% if verify_rows %}
+      <table>
+        <thead><tr><th style="width:64px">轮次</th><th style="width:76px">结果</th><th>问题</th><th style="width:70px">自动修正</th></tr></thead>
+        <tbody>
+          {% for r in verify_rows %}
+          <tr>
+            <td class="mono">R{{ r.round }}</td>
+            <td>{% if r.passed %}<span style="color:var(--ok);font-weight:600">✓ 通过</span>
+                {% else %}<span style="color:var(--warn);font-weight:600">待修正</span>{% endif %}</td>
+            <td>{{ r.issues }}</td>
+            <td class="mono"{% if r.fixes_detail %} title="{{ r.fixes_detail }}" style="cursor:help;text-decoration:underline dotted"{% endif %}>{{ r.fixes }} 项</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      <div style="margin-top:14px">
+        {% if verify_passed %}
+        <span class="conclusion ok">✓ 验证结论：模型与图纸投影自洽，尺寸对账通过</span>
+        {% else %}
+        <span class="conclusion fail">⚠ 验证结论：存在未决差异，请人工核对后可通过 revise 接口修正</span>
+        {% endif %}
+      </div>
+      {% if verify_note %}<div class="note">{{ verify_note }}</div>{% endif %}
+    </section>
+  </div>
+
+  <!-- ======= G-code ======= -->
+  {% if gcodes %}
+  <section class="card">
+    <h2>CNC G-code 预览<span class="h-sub">FANUC COMPATIBLE</span></h2>
+    {% for key in ('mill', 'turn') %}
+    {% if gcodes.get(key) %}
+    <div class="gcode-head">
+      <span>
+        <span class="fname">{{ gcodes[key].name }}</span>
+        &nbsp;共 {{ gcodes[key].lines }} 行{% if gcodes[key].truncated %}（预览前 {{ gcodes[key].preview.split('\n')|length }} 行）{% endif %}
+      </span>
+      <button class="btn" data-file="{{ 'model_mill.nc' if key == 'mill' else 'model_turn.nc' }}"
+              data-byname="1"><span class="fmt">NC</span> 下载完整代码</button>
+    </div>
+    <pre class="gcode">{{ gcodes[key].preview }}</pre>
+    {% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <!-- ======= 特征树 ======= -->
+  <section class="card">
+    <h2>特征树 / 重建元数据<span class="h-sub">FEATURE TREE</span></h2>
+    <table>
+      <tbody>
+        {% for k, v in feature_rows %}
+        <tr><td class="k mono">{{ k }}</td><td class="mono" style="word-break:break-all">{{ v }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="disclaimer">
+    <span class="d-ico">⚠</span>
+    <span>{{ disclaimer }}</span>
+  </div>
+
+  <footer>
+    Drawing2CAD · 零部件图纸 → 3D 工程模型智能重建系统
+    <span class="f-dot">·</span>报告生成于 {{ task.generated }}
+    <span class="f-dot">·</span>单文件离线可用
+  </footer>
+</div>
+
+<!-- ======= 离线下载数据 ======= -->
+<script id="dl-data" type="application/json">
+{{ download_files | tojson }}
+</script>
+
+<!-- ======= three.js（内联，离线可用） ======= -->
+<script>{{ three_js | safe }}</script>
+<script>{{ gltf_js | safe }}</script>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- 主题：自动 / 浅色 / 暗色 ---------------- */
+  var THEME_KEY = "d2c-report-theme";
+  var ICONS = {
+    auto: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+    light: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+    dark: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'
+  };
+  var ORDER = ["auto", "light", "dark"];
+  var mode = document.documentElement.getAttribute("data-mode") || "auto";
+  if (ORDER.indexOf(mode) < 0) mode = "auto";
+
+  function resolveDark() {
+    if (mode === "dark") return true;
+    if (mode === "light") return false;
+    return !!(window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
+  function applyTheme() {
+    var dark = resolveDark();
+    var root = document.documentElement;
+    root.setAttribute("data-theme", dark ? "dark" : "light");
+    root.style.colorScheme = dark ? "dark" : "light";
+    var icon = document.getElementById("icon-theme");
+    if (icon) icon.innerHTML = ICONS[mode];
+    var btn = document.getElementById("btn-theme");
+    if (btn) btn.title = "主题切换（当前：" +
+      (mode === "auto" ? "自动" : mode === "light" ? "浅色" : "暗色") + "）";
+  }
+  applyTheme();
+  if (window.matchMedia) {
+    try {
+      window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", function () { if (mode === "auto") applyTheme(); });
+    } catch (e) {}
+  }
+  document.getElementById("btn-theme").addEventListener("click", function () {
+    mode = ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length];
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+    applyTheme();
+  });
+
+  /* 自愈守卫：若外部（扩展 / 浏览器注入脚本）把 data-theme 改成与当前模式不符，
+     立即纠正回正确值，保证报告整页主题一致、不被外部写入者覆盖。
+     （与 Web-UI 同一逻辑：单一 dark 事实来源 + MutationObserver 自愈） */
+  if (window.MutationObserver) {
+    var _guard = new MutationObserver(function () {
+      var want = resolveDark() ? "dark" : "light";
+      if (document.documentElement.getAttribute("data-theme") !== want) applyTheme();
+    });
+    _guard.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+
+  /* ---------------- 打印 ---------------- */
+  document.getElementById("btn-print").addEventListener("click", function () {
+    window.print();
+  });
+
+  /* ---------------- 离线 / 在线下载 ---------------- */
+  var FILES = [];
+  try {
+    FILES = JSON.parse(document.getElementById("dl-data").textContent);
+  } catch (e) {}
+  var ONLINE = location.protocol === "http:" || location.protocol === "https:";
+  var ONLINE_BASE = {{ online_base | tojson }};
+  var ZIP_URL = {{ zip_url | tojson }};
+
+  function saveBase64(fname, mime, b64) {
+    var byteChars = atob(b64);
+    var arr = new Uint8Array(byteChars.length);
+    for (var i = 0; i < byteChars.length; i++) arr[i] = byteChars.charCodeAt(i);
+    var blob = new Blob([arr], { type: mime || "application/octet-stream" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  }
+  function downloadByName(fname) {
+    var hit = null;
+    for (var i = 0; i < FILES.length; i++) if (FILES[i].name === fname) hit = FILES[i];
+    if (ONLINE) { window.open(ONLINE_BASE + "/" + fname + "?dl=1", "_blank"); return; }
+    if (hit) saveBase64(hit.name, hit.mime, hit.b64);
+  }
+  var btns = document.querySelectorAll("[data-file]");
+  for (var i = 0; i < btns.length; i++) {
+    (function (btn) {
+      btn.addEventListener("click", function () {
+        if (btn.getAttribute("data-byname")) {
+          downloadByName(btn.getAttribute("data-file"));
+          return;
+        }
+        var f = FILES[parseInt(btn.getAttribute("data-file"), 10)];
+        if (!f) return;
+        if (ONLINE) window.open(ONLINE_BASE + "/" + f.name + "?dl=1", "_blank");
+        else saveBase64(f.name, f.mime, f.b64);
+      });
+    })(btns[i]);
+  }
+  document.getElementById("btn-zip").addEventListener("click", function () {
+    if (ONLINE) { window.open(ZIP_URL, "_blank"); return; }
+    alert("离线模式下请单独下载各格式文件（已全部内嵌）。");
+  });
+
+  /* ---------------- 3D 查看器（three.js） ---------------- */
+  var canvas = document.getElementById("viewer3d");
+  if (!canvas || typeof THREE === "undefined") return;
+
+  var wrap = document.getElementById("viewer-wrap");
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 5000);
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+
+  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x1c2c48, 1.0));
+  var dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(1.2, 1.8, 1.3);
+  scene.add(dir);
+  var rim = new THREE.DirectionalLight(0x5eb2ff, 0.45);
+  rim.position.set(-1.8, 0.7, -1.4);
+  scene.add(rim);
+  var grid = new THREE.GridHelper(800, 40, 0x3b82f6, 0x24406e);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.22;
+  scene.add(grid);
+
+  var model = null, meshList = [];
+  var spherical = { theta: 0.7, phi: 1.05, r: 300 }, target = new THREE.Vector3();
+  var vel = { theta: 0, phi: 0 };   /* 惯性 */
+  function updateCamera() {
+    var s = spherical;
+    camera.position.set(
+      target.x + s.r * Math.sin(s.phi) * Math.cos(s.theta),
+      target.y + s.r * Math.cos(s.phi),
+      target.z + s.r * Math.sin(s.phi) * Math.sin(s.theta));
+    camera.lookAt(target);
+  }
+  function fitView() {
+    if (!model) return;
+    var box = new THREE.Box3().setFromObject(model);
+    var c = box.getCenter(new THREE.Vector3());
+    // 将模型平移到世界原点居中，消除 CAD 坐标偏移，使其水平居中于网格
+    model.position.x -= c.x;
+    model.position.y -= c.y;
+    model.position.z -= c.z;
+    box.setFromObject(model);            // 重新计算已居中的包围盒
+    var size = box.getSize(new THREE.Vector3()).length();
+    target.set(0, 0, 0);                 // 相机目标锁定原点
+    spherical.r = size * 0.85;
+    grid.position.set(0, box.min.y, 0);  // 单层网格：水平居中原点、垂直落到模型底面
+    updateCamera();
+  }
+
+  var GLB_URI = "data:model/gltf-binary;base64,{{ glb_b64 }}";
+  var MODEL_PRODUCTS = {{ model_products | tojson | safe }};
+  function clearModel() {
+    if (model) { scene.remove(model); model = null; }
+    meshList = [];
+  }
+  function loadProduct(idx) {
+    if (!MODEL_PRODUCTS || !MODEL_PRODUCTS.length) {
+      if (typeof THREE.GLTFLoader !== "function") return;
+      new THREE.GLTFLoader().load(GLB_URI, onLoaded, undefined, onError);
+      return;
+    }
+    var p = MODEL_PRODUCTS[idx] || MODEL_PRODUCTS[MODEL_PRODUCTS.length - 1];
+    if (!p || !p.glb_b64) return;
+    clearModel();
+    var uri = "data:model/gltf-binary;base64," + p.glb_b64;
+    if (typeof THREE.GLTFLoader !== "function") return;
+    new THREE.GLTFLoader().load(uri, onLoaded, undefined, onError);
+  }
+  function onLoaded(gltf) {
+    model = gltf.scene;
+    model.traverse(function (o) {
+      if (o.isMesh) {
+        o.material = o.material || new THREE.MeshStandardMaterial();
+        if (o.material.metalness !== undefined && o.material.metalness < 0.2) {
+          o.material.metalness = Math.max(o.material.metalness, 0.35);
+          if (o.material.roughness !== undefined) {
+            o.material.roughness = Math.min(o.material.roughness, 0.45);
+          }
+        }
+        meshList.push(o);
+      }
+    });
+    scene.add(model);
+    fitView();
+  }
+  function onError() {
+    wrap.innerHTML = '<div style="padding:40px;color:#999">GLB 加载失败</div>';
+  }
+  // 默认加载最终（最后）产物；多产物时由下拉切换
+  loadProduct(MODEL_PRODUCTS && MODEL_PRODUCTS.length ? MODEL_PRODUCTS.length - 1 : -1);
+  var prodSel = document.getElementById("product-select");
+  if (prodSel) {
+    prodSel.addEventListener("change", function () {
+      loadProduct(parseInt(prodSel.value, 10));
+    });
+  }
+
+  /* 轨道控制：拖拽旋转（带惯性）+ 滚轮缩放 */
+  var dragging = false, px = 0, py = 0;
+  canvas.addEventListener("pointerdown", function (e) {
+    dragging = true; px = e.clientX; py = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var dt = (e.clientX - px) * 0.008;
+    var dp = (e.clientY - py) * 0.008;
+    spherical.theta += dt;
+    spherical.phi = Math.min(Math.PI - 0.05,
+                    Math.max(0.05, spherical.phi + dp));
+    vel.theta = dt; vel.phi = dp;
+    px = e.clientX; py = e.clientY;
+    updateCamera();
+  });
+  canvas.addEventListener("pointerup", function () { dragging = false; });
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    spherical.r = Math.min(2500, Math.max(8, spherical.r * (e.deltaY > 0 ? 1.1 : 0.9)));
+    updateCamera();
+  }, { passive: false });
+
+  var fitBtn = document.getElementById("btn-fit");
+  if (fitBtn) fitBtn.addEventListener("click", fitView);
+  var wire = false;
+  var wireBtn = document.getElementById("btn-wire");
+  if (wireBtn) wireBtn.addEventListener("click", function () {
+    wire = !wire;
+    meshList.forEach(function (m) {
+      if (m.material) m.material.wireframe = wire;
+    });
+  });
+
+  /* 全屏查看（独立于复位视角） */
+  var fullBtn = document.getElementById("btn-full");
+  function resizeViewer() {
+    if (!wrap.clientWidth) return;
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  }
+  if (fullBtn) fullBtn.addEventListener("click", function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (wrap.requestFullscreen) wrap.requestFullscreen();
+  });
+  document.addEventListener("fullscreenchange", resizeViewer);
+
+  window.addEventListener("resize", resizeViewer);
+
+  (function animate() {
+    requestAnimationFrame(animate);
+    /* 松手后的惯性旋转 */
+    if (!dragging && Math.abs(vel.theta) > 0.0001) {
+      spherical.theta += vel.theta;
+      vel.theta *= 0.94;
+      updateCamera();
+    }
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+
+<!-- 回到顶部悬浮按钮 -->
+<button type="button" id="rpt-totop" class="rpt-totop"
+        aria-label="回到顶部" title="回到顶部">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+       stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 19V6" />
+    <path d="M6 12l6-6 6 6" />
+  </svg>
+</button>
+<script>
+(function () {
+  var btn = document.getElementById("rpt-totop");
+  if (!btn) return;
+  function onScroll() { btn.classList.toggle("show", window.scrollY > 320); }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  btn.addEventListener("click", function () {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+})();
+</script>
+</body>
+</html>

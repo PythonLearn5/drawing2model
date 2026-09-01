@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawing2Model · 制造报告 · {{ job_id }}</title>
+{% if logo_b64 %}<link rel="icon" href="data:image/png;base64,{{ logo_b64 }}" />{% endif %}
+<script>
+/* 首帧防闪烁：三态主题 (自动/浅色/暗色)，与 web-ui 共用 d2c-theme-mode key (同端口同源) */
+(function () {
+  var KEY = "d2c-theme-mode";
+  var mode = "auto";
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved === "auto" || saved === "light" || saved === "dark") mode = saved;
+  } catch (e) {}
+  var sysDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  var dark = mode === "auto" ? sysDark : mode === "dark";
+  var root = document.documentElement;
+  root.setAttribute("data-theme", dark ? "dark" : "light");
+  root.style.colorScheme = dark ? "dark" : "light";
+  root.style.background = dark ? "#05070f" : "#f2f5fc";
+})();
+</script>
+<style>
+  /* ================== 设计变量 ================== */
+  :root {
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+
+    --bg: #05070f;
+    --glow-1: rgba(37, 99, 235, .26);
+    --glow-2: rgba(34, 211, 238, .15);
+    --glow-3: rgba(139, 92, 246, .17);
+    --grid-line: rgba(96, 150, 255, .05);
+
+    --card: rgba(13, 21, 40, .62);
+    --card-solid: #0c1425;
+    --border: rgba(96, 150, 255, .16);
+    --border-strong: rgba(96, 150, 255, .4);
+
+    --text: #e9effc;
+    --text-2: #9aabd0;
+    --text-3: #5c6d92;
+
+    --accent: #4d8dff;
+    --accent-2: #22d3ee;
+    --accent-3: #a78bfa;
+    --grad: linear-gradient(120deg, #2563eb 0%, #06b6d4 55%, #8b5cf6 110%);
+    --grad-text: linear-gradient(94deg, #7db4ff 0%, #5eead4 48%, #c4b5fd 100%);
+    --grad-glow: rgba(37, 99, 235, .4);
+
+    --ok: #4ade80; --ok-bg: rgba(74, 222, 128, .1); --ok-bd: rgba(74, 222, 128, .32);
+    --warn: #fbbf24; --warn-bg: rgba(251, 191, 36, .1); --warn-bd: rgba(251, 191, 36, .34);
+    --danger: #f87171;
+
+    --table-head: rgba(59, 130, 246, .09);
+    --table-stripe: rgba(96, 150, 255, .045);
+    --code-bg: #070c18;
+    --code-text: #cfe0ff;
+    --code-cmt: #5b7bb2;
+    --shadow: 0 14px 40px rgba(0, 0, 0, .42);
+    --viewer-bg: radial-gradient(620px 300px at 50% 0%, rgba(37,99,235,.16), transparent 70%),
+                 linear-gradient(180deg, #0a1222 0%, #060a14 100%);
+  }
+  [data-theme="light"] {
+    --bg: #f2f5fc;
+    --glow-1: rgba(59, 130, 246, .16);
+    --glow-2: rgba(34, 211, 238, .13);
+    --glow-3: rgba(139, 92, 246, .1);
+    --grid-line: rgba(47, 99, 235, .06);
+
+    --card: rgba(255, 255, 255, .78);
+    --card-solid: #ffffff;
+    --border: rgba(76, 119, 235, .15);
+    --border-strong: rgba(76, 119, 235, .34);
+
+    --text: #17233d;
+    --text-2: #51607e;
+    --text-3: #8a97b0;
+
+    --accent: #2f7bff;
+    --grad-text: linear-gradient(94deg, #1d4ed8 0%, #0e7490 48%, #6d28d9 100%);
+
+    --ok: #16a34a; --ok-bg: rgba(22, 163, 74, .09); --ok-bd: rgba(22, 163, 74, .3);
+    --warn: #d97706; --warn-bg: rgba(217, 119, 6, .09); --warn-bd: rgba(217, 119, 6, .32);
+    --danger: #dc2626;
+
+    --table-head: rgba(59, 130, 246, .07);
+    --table-stripe: rgba(59, 130, 246, .035);
+    --code-bg: #0b1220;
+    --code-text: #cfe0ff;
+    --shadow: 0 10px 32px rgba(31, 64, 130, .09);
+    --viewer-bg: radial-gradient(620px 300px at 50% 0%, rgba(37,99,235,.1), transparent 70%),
+                 linear-gradient(180deg, #eef3fc 0%, #e4ebf8 100%);
+  }
+
+  /* ================== 基础 ================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei",
+                 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .bg-fx {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(1100px 600px at 12% -8%, var(--glow-1) 0%, transparent 62%),
+      radial-gradient(900px 560px at 100% 10%, var(--glow-3) 0%, transparent 58%),
+      radial-gradient(1000px 640px at 88% 108%, var(--glow-2) 0%, transparent 56%),
+      var(--bg);
+  }
+  .bg-fx::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 90% 72% at 50% 16%, #000 30%, transparent 92%);
+    mask-image: radial-gradient(ellipse 90% 72% at 50% 16%, #000 30%, transparent 92%);
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 22px 28px 56px; }
+  ::selection { background: rgba(59, 130, 246, .3); }
+
+  /* ================== 工具栏 ================== */
+  .toolbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; justify-content: flex-end; align-items: center;
+    gap: 8px; flex-wrap: wrap;
+    padding: 10px 26px;
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border-bottom: 1px solid var(--border);
+  }
+  .toolbar .brand {
+    margin-right: auto; display: inline-flex; align-items: center; gap: 10px;
+    color: var(--text); text-decoration: none;
+  }
+  .toolbar .brand .b-name { font-weight: 700; letter-spacing: .5px; font-size: 14px;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent; }
+  .toolbar .brand .b-sub { font-size: 10.5px; color: var(--text-3);
+    letter-spacing: 1.6px; font-family: var(--mono); }
+  .toolbar .brand img { width: 26px; height: 26px; border-radius: 7px;
+    box-shadow: 0 3px 12px var(--grad-glow); }
+
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 9px; cursor: pointer; flex: none;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    color: var(--text-2); display: inline-flex; align-items: center;
+    justify-content: center; transition: all .22s var(--ease);
+    font-size: 15px;
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--border-strong);
+    box-shadow: 0 0 14px var(--grad-glow); transform: translateY(-1px); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border); border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    color: var(--text-2);
+    padding: 6.5px 13px; font-size: 12.5px; cursor: pointer;
+    transition: all .22s var(--ease); letter-spacing: .3px;
+    font-family: inherit; text-decoration: none;
+  }
+  .btn .fmt { font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: .8px; padding: 1.5px 6px; border-radius: 5px;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .btn:hover { color: var(--accent); border-color: var(--border-strong);
+    box-shadow: 0 0 14px var(--grad-glow); transform: translateY(-1px); }
+  .btn.primary {
+    background: var(--grad); border: none; color: #fff; font-weight: 600;
+    box-shadow: 0 4px 16px var(--grad-glow);
+  }
+  .btn.primary:hover { color: #fff; filter: brightness(1.08);
+    box-shadow: 0 6px 22px var(--grad-glow); }
+
+  /* ================== Hero ================== */
+  .hero {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 30px 32px; margin-top: 20px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 18px; box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+  }
+  .hero::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--grad); opacity: .9;
+  }
+  .hero::after {
+    content: ""; position: absolute; right: -120px; top: -140px;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, var(--glow-1), transparent 68%);
+    pointer-events: none;
+  }
+  .hero img.logo { height: 62px; position: relative; filter: drop-shadow(0 6px 18px var(--grad-glow)); }
+  .hero .h-main { position: relative; flex: 1; min-width: 260px; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 2.6px;
+    color: var(--accent-2); margin-bottom: 8px; text-transform: uppercase;
+  }
+  .hero .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2);
+    animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.75); } }
+  .hero .title {
+    font-size: 24px; font-weight: 750; letter-spacing: .6px; line-height: 1.35;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .hero .sub { color: var(--text-3); font-size: 12.5px; margin-top: 8px;
+    font-family: var(--mono); letter-spacing: .4px; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .badge {
+    font-size: 12px; padding: 3px 12px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    letter-spacing: .3px;
+  }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bd); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bd); }
+  .badge.mono { font-family: var(--mono); font-size: 11px; letter-spacing: .8px; }
+
+  /* ================== 概览数据带 ================== */
+  .stats-band {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 18px;
+    backdrop-filter: blur(12px);
+    transition: all .3s var(--ease); position: relative; overflow: hidden;
+  }
+  .stat::after {
+    content: ""; position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px;
+    background: var(--grad); opacity: 0; transition: opacity .3s var(--ease);
+  }
+  .stat:hover { transform: translateY(-3px); border-color: var(--border-strong);
+    box-shadow: 0 10px 30px rgba(37, 99, 235, .14); }
+  .stat:hover::after { opacity: 1; }
+  .stat .s-label { font-size: 11px; color: var(--text-3); letter-spacing: 1.8px;
+    text-transform: uppercase; font-family: var(--mono); }
+  .stat .s-value {
+    font-family: var(--mono); font-size: 24px; font-weight: 700; margin-top: 5px;
+    background: var(--grad-text);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    word-break: break-all;
+  }
+  .stat .s-note { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
+
+  /* ================== 卡片 ================== */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--shadow);
+    backdrop-filter: blur(14px);
+    padding: 22px 26px; margin-top: 18px;
+    animation: rise .5s var(--ease) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  .card h2 {
+    font-size: 16px; font-weight: 650; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px; letter-spacing: .4px;
+  }
+  .card h2::before {
+    content: ""; width: 4px; height: 17px; border-radius: 3px;
+    background: var(--grad); box-shadow: 0 0 10px var(--grad-glow);
+  }
+  .card h2 .h-sub { margin-left: auto; font-size: 11px; font-weight: 400;
+    color: var(--text-3); font-family: var(--mono); letter-spacing: 1.2px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  .grid-2 > .card { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 13px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--table-head); color: var(--text-2); font-weight: 600;
+       white-space: nowrap; letter-spacing: .5px; font-size: 12px; }
+  tbody tr { transition: background .2s var(--ease); }
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  td.k { color: var(--text-2); width: 38%; }
+  td .mono, .mono { font-family: var(--mono); font-size: 12px; letter-spacing: .3px; }
+  .tbl-scroll { max-height: 340px; overflow: auto; border-radius: 8px; }
+
+  /* ================== 3D 查看器 ================== */
+  #viewer-wrap {
+    position: relative; height: 440px; border-radius: 14px;
+    overflow: hidden; background: var(--viewer-bg);
+    border: 1px solid var(--border);
+  }
+  #viewer-wrap::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background-image:
+      linear-gradient(rgba(96,150,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,150,255,.05) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  #viewer3d { width: 100%; height: 100%; display: block; position: relative; z-index: 2; }
+  .viewer-tools { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; z-index: 4; }
+  #viewer-wrap:fullscreen { height: 100vh; width: 100vw; border-radius: 0; border: none; }
+  #viewer-wrap:fullscreen #viewer3d { width: 100%; height: 100%; }
+  .viewer-badge {
+    position: absolute; left: 14px; bottom: 12px; z-index: 4;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.6px;
+    color: rgba(158, 185, 230, .68);
+  }
+
+  /* ================== G-code ================== */
+  pre.gcode {
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 12px; padding: 16px 18px; overflow: auto;
+    font-family: var(--mono);
+    font-size: 12px; line-height: 1.7; max-height: 340px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 2px 14px rgba(0, 0, 0, .35);
+  }
+  pre.gcode::-webkit-scrollbar { width: 8px; height: 8px; }
+  pre.gcode::-webkit-scrollbar-thumb { background: rgba(96,150,255,.28); border-radius: 6px; }
+  .gcode-head { display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; flex-wrap: wrap;
+    margin: 12px 0 8px; color: var(--text-2); font-size: 13px; }
+  .gcode-head .fname { font-family: var(--mono); font-size: 12px; color: var(--accent-2); }
+
+  /* ================== 结论 / 提示 ================== */
+  .conclusion {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 13.5px; font-weight: 600;
+    padding: 10px 18px; border-radius: 12px; letter-spacing: .3px;
+  }
+  .conclusion.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid var(--ok-bd); }
+  .conclusion.fail { color: var(--danger); background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.32); }
+  .note { color: var(--text-3); font-size: 12px; margin-top: 8px; }
+  .disclaimer {
+    margin-top: 24px; padding: 14px 18px; border-radius: 12px;
+    background: var(--warn-bg); border: 1px solid var(--warn-bd);
+    color: var(--warn); font-size: 12.5px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .disclaimer .d-ico { flex: none; font-weight: 700; }
+  footer { text-align: center; color: var(--text-3); font-size: 12px;
+    margin-top: 30px; letter-spacing: .4px; }
+  footer .f-dot { margin: 0 8px; opacity: .5; }
+
+  /* ================== 响应式 ================== */
+  @media (max-width: 960px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .stats-band { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .page { padding: 14px 14px 44px; }
+    .toolbar { padding: 8px 14px; gap: 6px; }
+    .toolbar .brand .b-sub { display: none; }
+    .hero { padding: 22px 20px; }
+    .hero .title { font-size: 20px; }
+    .stats-band { grid-template-columns: 1fr 1fr; gap: 10px; }
+    #viewer-wrap { height: 300px; }
+    .card { padding: 18px 16px; }
+    th, td { padding: 7px 9px; }
+  }
+
+  /* ================== 打印适配 ================== */
+  @media print {
+    body { background: #fff !important; color: #111; font-size: 12px; }
+    .bg-fx, .toolbar, .viewer-tools, .no-print { display: none !important; }
+    .card, .hero, .stat {
+      box-shadow: none; backdrop-filter: none; background: #fff;
+      border: 1px solid #ddd; break-inside: avoid; animation: none;
+      color: #111;
+    }
+    .hero .title, .stat .s-value {
+      -webkit-text-fill-color: #1a3a7a; color: #1a3a7a; background: none;
+    }
+    .hero .eyebrow { color: #1a3a7a; }
+    .hero .eyebrow .dot { animation: none; background: #1a3a7a; box-shadow: none; }
+    .badge { background: #f0f4fb; color: #1a3a7a; border-color: #c9d8f2; }
+    .badge.ok { color: #15803d; } .badge.warn { color: #b45309; }
+    .stat .s-label, .hero .sub, .note, footer, .viewer-badge { color: #666 !important; }
+    #viewer-section { display: none !important; }
+    pre.gcode { max-height: none; background: #f4f6f9; color: #222;
+      border: 1px solid #ddd; box-shadow: none; }
+    th { background: #eef2f8; color: #333; }
+    tbody tr:nth-child(even) { background: #f7f9fc; }
+    th, td { border-bottom: 1px solid #e3e8f0; }
+    .conclusion.ok { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+    .conclusion.fail { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .disclaimer { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  /* ================== 回到顶部悬浮按钮 ================== */
+  .rpt-totop {
+    position: fixed; right: 28px; bottom: 28px; z-index: 60;
+    width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-strong); border-radius: 14px;
+    background: var(--card); color: var(--accent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+    cursor: pointer; opacity: 0; transform: translateY(16px) scale(.9);
+    pointer-events: none;
+    transition: opacity .28s var(--ease), transform .28s var(--ease),
+                background .2s, color .2s, border-color .2s;
+  }
+  .rpt-totop.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .rpt-totop:hover { background: var(--grad); color: #fff; border-color: transparent; }
+  @media (max-width: 600px) {
+    .rpt-totop { right: 16px; bottom: 16px; width: 42px; height: 42px; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-fx no-print" aria-hidden="true"></div>
+
+<!-- ======= 工具栏 ======= -->
+<div class="toolbar no-print">
+  <span class="brand">
+    {% if logo_b64 %}<img src="data:image/png;base64,{{ logo_b64 }}" alt="logo">{% endif %}
+    <span>
+      <div class="b-name">Drawing2Model</div>
+      <div class="b-sub">MANUFACTURING REPORT</div>
+    </span>
+  </span>
+  <button class="icon-btn" id="btn-theme" title="主题：自动（点击切换）" aria-label="主题切换">
+    <svg id="ico-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+    <svg id="ico-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" style="display:none">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+    <svg id="ico-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" style="display:none">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </svg>
+  </button>
+  <button class="icon-btn" id="btn-print" title="打印报告">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 6 2 18 2 18 9"></polyline>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+      <rect x="6" y="14" width="12" height="8"></rect>
+    </svg>
+  </button>
+  {% for a in artifacts %}
+  <a class="btn" href="/api/jobs/{{ job_id }}/artifacts/{{ a.kind }}"
+     title="下载 {{ a.ext }} 产物" download><span class="fmt">{{ a.ext }}</span></a>
+  {% endfor %}
+  <a class="btn primary" id="btn-zip" href="{{ zip_url }}" title="下载全部产物 ZIP 包">⬇ 全部打包</a>
+</div>
+
+<div class="page">
+
+  <!-- ======= 头部 ======= -->
+  <section class="hero">
+    {% if logo_b64 %}<img class="logo" src="data:image/png;base64,{{ logo_b64 }}" alt="logo">{% endif %}
+    <div class="h-main">
+      <div class="eyebrow"><span class="dot"></span>Drawing2Model · Manufacturing Report</div>
+      <div class="title">{{ title }}</div>
+      <div class="sub">
+        JOB {{ job_id }} &nbsp;·&nbsp; GENERATED {{ generated }} &nbsp;·&nbsp; MODE {{ mode }}
+      </div>
+      <div class="badges">
+        <span class="badge">零件族：{{ family_label }}</span>
+        {% if best_score is not none %}<span class="badge mono">最优 v{{ best_round }} · {{ "%.2f"|format(best_score) }}</span>{% endif %}
+        {% if bbox %}<span class="badge mono">{{ bbox }}</span>{% endif %}
+        {% if volume_cm3 %}<span class="badge mono">V {{ volume_cm3 }} cm³</span>{% endif %}
+        {% if quality_passed %}
+        <span class="badge ok">✓ 自检通过</span>
+        {% else %}
+        <span class="badge warn">⚠ 自检提示</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= 概览数据带 ======= -->
+  <div class="stats-band">
+    <div class="stat">
+      <div class="s-label">Outline Size</div>
+      <div class="s-value">{{ bbox or '-' }}</div>
+      <div class="s-note">外形尺寸（mm）</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">Volume</div>
+      <div class="s-value">{{ volume_cm3 or '-' }}{% if volume_cm3 %} cm³{% endif %}</div>
+      <div class="s-note">模型体积</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">Best Version</div>
+      <div class="s-value">v{{ best_round or '-' }}</div>
+      <div class="s-note">交付版本（相似度 {{ "%.2f"|format(best_score) if best_score is not none else '-' }}）</div>
+    </div>
+    <div class="stat">
+      <div class="s-label">G-code Lines</div>
+      <div class="s-value">{{ gcode_lines or '-' }}</div>
+      <div class="s-note">数控代码总行数</div>
+    </div>
+  </div>
+
+  <!-- ======= 3D 模型（单模型，无多产物切换） ======= -->
+  <section class="card" id="viewer-section">
+    <h2>3D 模型交互查看<span class="h-sub">WEBGL · GLB EMBEDDED</span></h2>
+    <div id="viewer-wrap">
+      {% if glb_b64 %}
+      <canvas id="viewer3d"></canvas>
+      <div class="viewer-tools">
+        <button class="icon-btn" id="btn-full" title="全屏查看">⛶</button>
+        <button class="icon-btn" id="btn-fit" title="复位视角">⟲</button>
+      </div>
+      <div class="viewer-badge">DRAG TO ROTATE · WHEEL TO ZOOM</div>
+      {% else %}
+      <div style="padding:40px;color:var(--text-3);position:relative;z-index:2">无可用模型预览</div>
+      {% endif %}
+    </div>
+    <div class="note">鼠标拖拽旋转 · 滚轮缩放（离线 GLB 已内嵌，无需网络）</div>
+  </section>
+
+  <!-- ======= 图纸数据 ======= -->
+  <section class="card">
+    <h2>图纸数据<span class="h-sub">DRAWING DATA</span></h2>
+    {% if drawing_rows %}
+    <table>
+      <thead><tr><th style="width:38%">项目</th><th>数值 / 说明</th></tr></thead>
+      <tbody>
+        {% for k, v in drawing_rows %}
+        <tr><td class="k">{{ k }}</td><td class="mono">{{ v }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="note">未从图纸/识别结果提取到结构化截面数据。</div>
+    {% endif %}
+    {% if sections_table %}
+    <h2 style="margin-top:20px">截面坐标表（各站位 / 厚度）<span class="h-sub">SECTIONS</span></h2>
+    <div class="tbl-scroll">
+    <table>
+      <thead><tr>{% for c in sections_table.header %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in sections_table.rows %}
+        <tr>{% for c in row %}<td class="mono">{{ c }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="grid-2">
+    <!-- ======= 设备与工装 ======= -->
+    <section class="card">
+      <h2>设备与工装<span class="h-sub">MACHINE &amp; TOOLING</span></h2>
+      <table>
+        <tbody>
+          <tr><td class="k">主要机加工设备</td><td>{{ equipment }}</td></tr>
+          <tr><td class="k">工装 / 装夹</td><td>{{ fixture }}</td></tr>
+        </tbody>
+      </table>
+      {% if tools %}
+      <h2 style="margin-top:18px">刀具与初始切削参数<span class="h-sub">CUTTING TOOLS</span></h2>
+      <table>
+        <thead><tr><th style="width:56px">刀号</th><th>刀具</th><th>初始切削参数</th></tr></thead>
+        <tbody>
+          {% for no, name, param in tools %}
+          <tr><td class="mono">{{ no }}</td><td>{{ name }}</td><td class="mono">{{ param }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+
+    <!-- ======= 质量检验 ======= -->
+    <section class="card">
+      <h2>质量检验<span class="h-sub">QUALITY INSPECTION</span></h2>
+      <table>
+        <thead><tr><th>图纸技术要求</th><th style="width:130px">检验方法</th></tr></thead>
+        <tbody>
+          {% for req, method in quality_rows %}
+          <tr><td>{{ req }}</td><td>{{ method }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div style="margin-top:14px">
+        {% if quality_passed %}
+        <span class="conclusion ok">✓ 模型自检通过：体积有效、拓扑闭合，可交付</span>
+        {% else %}
+        <span class="conclusion fail">⚠ {{ quality_note }}</span>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <!-- ======= G-code ======= -->
+  {% if gcode_preview %}
+  <section class="card">
+    <h2>CNC G-code 预览<span class="h-sub">FANUC COMPATIBLE · 中文注释</span></h2>
+    <div class="gcode-head">
+      <span>
+        <span class="fname">{{ gcode_name }}</span>
+        &nbsp;共 {{ gcode_lines }} 行（预览前 {{ gcode_preview_lines }} 行）
+      </span>
+      <a class="btn" href="/api/jobs/{{ job_id }}/artifacts/{{ gcode_kind }}" download>
+        <span class="fmt">NC</span>下载完整代码
+      </a>
+    </div>
+    <pre class="gcode">{{ gcode_preview | safe }}</pre>
+  </section>
+  {% endif %}
+
+  <!-- ======= 重建元数据 ======= -->
+  <section class="card">
+    <h2>重建元数据<span class="h-sub">METADATA</span></h2>
+    <table>
+      <tbody>
+        {% for k, v in meta_rows %}
+        <tr><td class="k mono">{{ k }}</td><td class="mono" style="word-break:break-all">{{ v }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="disclaimer">
+    <span class="d-ico">⚠</span>
+    <span>本报告与模型由 Drawing2Model 自动生成，仅供工程参考。首件加工前请在 CAM 仿真环境中验证刀路并复核图纸尺寸；全部产物可通过本服务同端口下载。</span>
+  </div>
+
+  <footer>
+    Drawing2Model · 工程图纸 → 3D 模型 · G-Code · 制造报告
+    <span class="f-dot">·</span>报告生成于 {{ generated }}
+    <span class="f-dot">·</span>单文件离线可用
+  </footer>
+</div>
+
+<!-- ======= three.js 内联（离线可用） ======= -->
+{% if glb_b64 %}
+<script>{{ three_js | safe }}</script>
+<script>{{ gltf_js | safe }}</script>
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("viewer3d");
+  if (!canvas || typeof THREE === "undefined") return;
+  var wrap = document.getElementById("viewer-wrap");
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 8000);
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x1c2c48, 1.0));
+  var dir = new THREE.DirectionalLight(0xffffff, 1.2); dir.position.set(1.2, 1.8, 1.3); scene.add(dir);
+  var rim = new THREE.DirectionalLight(0x5eb2ff, 0.45); rim.position.set(-1.8, 0.7, -1.4); scene.add(rim);
+  var grid = new THREE.GridHelper(800, 40, 0x3b82f6, 0x24406e);
+  grid.material.transparent = true; grid.material.opacity = 0.22; scene.add(grid);
+
+  var model = null;
+  var spherical = { theta: 0.7, phi: 1.05, r: 300 }, target = new THREE.Vector3();
+  function updateCamera() {
+    camera.position.set(
+      target.x + spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta),
+      target.y + spherical.r * Math.cos(spherical.phi),
+      target.z + spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta));
+    camera.lookAt(target);
+  }
+  function fitView() {
+    if (!model) return;
+    var box = new THREE.Box3().setFromObject(model);
+    var c = box.getCenter(new THREE.Vector3());
+    model.position.sub(c);
+    box.setFromObject(model);
+    var size = box.getSize(new THREE.Vector3()).length();
+    target.set(0, 0, 0);
+    spherical.r = size * 0.85;
+    grid.position.set(0, box.min.y, 0);
+    camera.near = Math.max(size / 200, 0.01); camera.far = size * 20;
+    camera.updateProjectionMatrix();
+    updateCamera();
+  }
+  if (typeof THREE.GLTFLoader !== "function") return;
+  new THREE.GLTFLoader().load("data:model/gltf-binary;base64,{{ glb_b64 }}", function (gltf) {
+    model = gltf.scene;
+    model.traverse(function (o) {
+      if (o.isMesh) {
+        o.material = o.material || new THREE.MeshStandardMaterial();
+        if (o.material.metalness !== undefined && o.material.metalness < 0.2) {
+          o.material.metalness = Math.max(o.material.metalness, 0.35);
+          if (o.material.roughness !== undefined) o.material.roughness = Math.min(o.material.roughness, 0.45);
+        }
+      }
+    });
+    scene.add(model);
+    fitView();
+  }, undefined, function () {
+    wrap.innerHTML = '<div style="padding:40px;color:#f87171;position:relative;z-index:2">GLB 加载失败</div>';
+  });
+
+  var dragging = false, px = 0, py = 0;
+  canvas.addEventListener("pointerdown", function (e) { dragging = true; px = e.clientX; py = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    spherical.theta += (e.clientX - px) * 0.008;
+    spherical.phi = Math.min(Math.PI - 0.05, Math.max(0.05, spherical.phi + (e.clientY - py) * 0.008));
+    px = e.clientX; py = e.clientY; updateCamera();
+  });
+  canvas.addEventListener("pointerup", function () { dragging = false; });
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    spherical.r = Math.min(6000, Math.max(5, spherical.r * (e.deltaY > 0 ? 1.1 : 0.9)));
+    updateCamera();
+  }, { passive: false });
+
+  var fitBtn = document.getElementById("btn-fit");
+  if (fitBtn) fitBtn.addEventListener("click", fitView);
+  var fullBtn = document.getElementById("btn-full");
+  function resizeViewer() {
+    if (!wrap.clientWidth) return;
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  }
+  if (fullBtn) fullBtn.addEventListener("click", function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (wrap.requestFullscreen) wrap.requestFullscreen();
+  });
+  document.addEventListener("fullscreenchange", resizeViewer);
+  window.addEventListener("resize", resizeViewer);
+  (function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); })();
+})();
+</script>
+{% endif %}
+
+<script>
+(function () {
+  /* 三态主题切换: 自动 → 浅色 → 暗色 → 自动; 与 web-ui 共用 d2c-theme-mode (同端口同源自动共享) */
+  var KEY = "d2c-theme-mode";
+  var btn = document.getElementById("btn-theme");
+  var root = document.documentElement;
+  var LABEL = { auto: "自动（跟随系统）", light: "浅色", dark: "暗色" };
+  var NEXT = { auto: "light", light: "dark", dark: "auto" };
+  var icons = { auto: document.getElementById("ico-auto"),
+                light: document.getElementById("ico-light"),
+                dark: document.getElementById("ico-dark") };
+  function getMode() {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === "auto" || v === "light" || v === "dark") return v;
+    } catch (e) {}
+    return "auto";
+  }
+  function apply(mode) {
+    var sysDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var dark = mode === "auto" ? sysDark : mode === "dark";
+    root.setAttribute("data-theme", dark ? "dark" : "light");
+    root.style.colorScheme = dark ? "dark" : "light";
+    root.style.background = dark ? "#05070f" : "#f2f5fc";
+    for (var k in icons) if (icons[k]) icons[k].style.display = (k === mode) ? "" : "none";
+    if (btn) btn.title = "主题：" + LABEL[mode] + "（点击切换）";
+  }
+  if (btn) btn.addEventListener("click", function () {
+    var m = NEXT[getMode()];
+    try { localStorage.setItem(KEY, m); } catch (e) {}
+    apply(m);
+  });
+  var mode0 = getMode();
+  if (mode0 === "auto" && window.matchMedia) {
+    try {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var fn = function () { if (getMode() === "auto") apply("auto"); };
+      if (mq.addEventListener) mq.addEventListener("change", fn);
+      else if (mq.addListener) mq.addListener(fn);
+    } catch (e) {}
+  }
+  apply(mode0);
+
+  var p = document.getElementById("btn-print");
+  if (p) p.addEventListener("click", function () { window.print(); });
+})();
+</script>
+
+<!-- 回到顶部悬浮按钮 -->
+<button type="button" id="rpt-totop" class="rpt-totop no-print" aria-label="回到顶部" title="回到顶部">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+       stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 19V6" />
+    <path d="M6 12l6-6 6 6" />
+  </svg>
+</button>
+<script>
+(function () {
+  var btn = document.getElementById("rpt-totop");
+  if (!btn) return;
+  function onScroll() { btn.classList.toggle("show", window.scrollY > 320); }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  btn.addEventListener("click", function () {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+})();
+</script>
+</body>
+</html>

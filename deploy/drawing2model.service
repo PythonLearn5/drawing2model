@@ -1,0 +1,31 @@
+[Unit]
+Description=Drawing2Model - Engineering Drawing to 3D Model Agent (FastAPI + MCP)
+Documentation=http://127.0.0.1:8410/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=drawing2model
+Group=drawing2model
+WorkingDirectory=/data/drawing2model
+# LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 等运行配置; "-" 前缀=文件不存在也不报错
+EnvironmentFile=-/data/drawing2model/.env
+# worker 沙箱解释器: 指向装有 cadquery + OCP 的 venv (见 app/runtime.py)
+Environment="D2M_WORKER_PY=/data/drawing2model/venv_worker/bin/python"
+ExecStart=/data/drawing2model/venv_server/bin/python /data/drawing2model/server.py
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+# 单任务迭代时长有限 (硬上限 12 轮), uvicorn 本身长驻, 无需 WatchdogSec
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=drawing2model
+# ---- 适度放开资源限制 ----
+LimitNOFILE=65536
+# LLM 生成代码子进程 + 渲染, 内存峰值可能较高
+MemoryMax=8G
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="description" content="Drawing2Model — 工程图纸智能重建：工程图 PDF → 3D 模型 + CNC G-code + 制造报告" />
+    <meta name="theme-color" content="#05070f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f5fc" media="(prefers-color-scheme: light)" />
+    <title>Drawing2Model · 工程图纸 → 3D 模型 · G-Code · 制造报告</title>
+    <style>
+      /* 首帧防闪烁：背景跟随 data-theme（由内联脚本在 React 挂载前同步写入），
+         不再依赖系统 media query，避免“OS 暗色 → 背景暗，但 data-theme 浅 → 内容浅”的分裂。 */
+      html { background: #f2f5fc; }
+      html[data-theme="dark"] { background: #05070f; }
+    </style>
+    <script>
+      // 防御：注销任何历史遗留的 Service Worker（会无视 no-cache 吐旧缓存，
+      // 导致前端修复“看起来不生效”）。无 SW 时这里是空操作，安全。
+      if ('serviceWorker' in navigator) {
+        try {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            (regs || []).forEach(function (r) { r.unregister(); });
+          });
+        } catch (e) {}
+      }
+      // 在 React 挂载前同步主题，避免首帧深色闪烁 / data-theme 错位。
+      // 这是「单一事实来源」：React 挂载后会直接读取此处写入的 data-theme，
+      // 不再独立重算 matchMedia，从而杜绝「页面浅色 + 组件暗色」的错位。
+      // data-build 用于确认浏览器实际运行的是哪次构建。
+      (function () {
+        try {
+          var THEME_KEY = 'd2c-theme-mode';
+          var mode = localStorage.getItem(THEME_KEY);
+          if (!['auto', 'light', 'dark'].includes(mode)) mode = 'auto';
+          var sysDark = window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = mode === 'auto' ? sysDark : mode === 'dark';
+          var root = document.documentElement;
+          root.setAttribute('data-theme', dark ? 'dark' : 'light');
+          root.style.colorScheme = dark ? 'dark' : 'light';
+          root.style.background = dark ? '#05070f' : '#f2f5fc';
+          root.setAttribute('data-build', '20260826f');
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-CymDKXKV.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-bQyuB40v.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

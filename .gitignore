@@ -1,0 +1,41 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+venv_server/
+venv_worker/
+
+# ---- Node / 前端构建中间物 ----
+# (web/dist 刻意保留在仓库: 服务器一键部署无 node 依赖, 说明见 README)
+web/node_modules
+web/dist/**/*.map
+node_modules/
+
+# ---- 本机构建暂存 (rollup 规避符号链接用) ----
+.buildtmp/
+
+# ---- 运行产物与日志 (635MB+, 绝不入库) ----
+output/
+outputs/
+*.log
+
+# ---- LLM 缓存与临时 ----
+.llm_cache/
+_tmp/
+
+# ---- 凭证与本地配置 ----
+.env
+.env.*
+!.env.example
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---- WorkBuddy 会话数据 ----
+.workbuddy/
+/web/yarn.lock
