@@ -89,7 +89,7 @@ pip install cadquery numpy pymupdf pillow  # 建模内核 (worker 沙箱执行 L
 cd web; npm install; npm run build; cd ..
 
 # 4) 指定 worker/util 解释器为当前 venv (覆盖默认的托管 python 路径)
-$env:LLM_API_KEY = "sk-0884061a7ead43e7be2a5ab436df103c"
+$env:LLM_API_KEY = "sk-"
 $env:D2M_WORKER_PY = "$PWD\venv\Scripts\python.exe"
 $env:D2M_UTIL_PY   = "$PWD\venv\Scripts\python.exe"
 # 5) 启动服务 (默认 :8410)
